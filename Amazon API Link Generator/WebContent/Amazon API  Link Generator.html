@@ -2,9 +2,128 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<style type="text/css">
+	div#input label {
+		width: 200px;
+	}
+	
+	.error {
+		color: red;
+	}
+</style>
+<script type="text/javascript" src="./js/jquery_1.6.2.min.js"></script>
 <title>Amazon API链接生成器</title>
 </head>
-<body>
+	<body style="text-align: center;">
+		<h2>Amazon API链接生成器</h2>
+		<div id="input">
+			<label>awsAccessKeyId:&nbsp;</label><input type="text" id="AWSAccessKeyId" value=""><br>
+			<label>awsSecretKey:&nbsp;</label><input type="password" id="AWSSecretKey" value=""><br>
+			<label>Operation:&nbsp;</label><select id="Operation"><option value="BrowseNodeLookup">BrowseNodeLookup</option></select><br>
+			<label>BrowseNodeId:&nbsp;</label><input type="text" id="BrowseNodeId" value=""><br>
+			<label>ResponseGroup:&nbsp;</label><input type="text" id="ResponseGroup" value="NewReleases"><br>
+			<br>
+			<input type="button" value="生成" id="generateLink"><br>
+		</div>
+		<br>
+		<div id="output">
+			<span class="error" id="errorMsg"></span><br>
+			<a id="apiLink" href="" target="_blank;"></a><br>
+		</div>
+		<script type="text/javascript">
+			function showError(errMsg) {
+				$("#errorMsg").html(errMsg);
+			}
 
-</body>
+			function clearError() {
+				$(".error").html("");
+			}
+			
+			$(document).ready(function() {
+				$("#generateLink").click(function() {
+					clearError();
+					var params = {};
+					$("#input").find("input[type=text], select").each(function() {
+						if (!this.value || this.value == "") {
+							var errMsg = "请输入" + this.id + "。";
+							showError(errMsg);
+							return false;
+						}
+						$(params).attr(this.id, this.value);
+					});
+					if ($("#errorMsg").html() == "") {
+						var result = SignHelper.sign(params, $("#AWSSecretKey").val());
+						$("#output").find("a#apiLink").attr("href", result);
+						$("#output").find("a#apiLink").html(result);
+					}
+				});
+			});
+		</script>
+		<script type="text/javascript">
+				
+			var SignHelper = (function() {
+				var _CONSTANTS = {
+						TIME_FORMAT : "yyyy-mm-dd'T'HH:MM:ss'Z'",
+						REQUEST_URI : "/onca/xml",
+						REQUEST_METHOD : "GET",
+						endpoint : "ecs.amazonaws.jp"
+					};
+				
+				var canonicalize = function(params) {
+					var cannoical = "";
+					if (!params) {
+						return cannoical;
+					}
+					var para_array = [];
+					for (var pname in params) {
+						var key = pname;
+						var val = params[key] ? params[key] : "";
+						para_array.push(percentEncodeRfc3986(key) + "=" + percentEncodeRfc3986(val));
+					}
+					cannoical = para_array.sort().join("&");
+					return cannoical;
+				};
+		
+				var percentEncodeRfc3986 = function(str) {
+					var out;
+					try {
+						out = encodeURIComponent(str).replace(/\+/g, "%20").replace(/\*/g, "%2A").replace(/%7E/g, "~");
+					} catch(err) {
+						out = str;
+					}
+					return out;
+				};
+
+				var getHmac = function(key, toSign) {
+					HMAC_SHA256_init(key);
+					HMAC_SHA256_write(toSign);
+					var array_hash = HMAC_SHA256_finalize();
+					var str_hash = "";
+					for (var i = 0; i < array_hash.length; i++) {
+					  str_hash += String.fromCharCode(array_hash[i]);
+					}
+					return Base64.encode(str_hash);
+				};
+				
+				return {
+					getConst: function(name) {
+						return _CONSTANTS[name];
+					},
+					sign : function(params, secretKey) {
+						params["Service"] = "AWSECommerceService";
+						params["Timestamp"] = (new Date()).format(_CONSTANTS["TIME_FORMAT"]);
+						var canonicalQS = canonicalize(params);
+						var toSign = _CONSTANTS["REQUEST_METHOD"] + "\n" + _CONSTANTS["endpoint"] + "\n" + _CONSTANTS["REQUEST_URI"] + "\n" + canonicalQS;
+						var hmac = getHmac(secretKey, toSign);
+						var sig = percentEncodeRfc3986(hmac);
+						var url = "http://" + _CONSTANTS["endpoint"] + _CONSTANTS["REQUEST_URI"] + "?" + canonicalQS + "&Signature=" + sig;
+						return url;
+					};
+				};
+			})();
+		</script>
+		<script type="text/javascript" src="./js/date.format.js"></script>
+		<script type="text/javascript" src="./js/jssha256.js"></script>
+		<script type="text/javascript" src="./js/base64.js"></script>
+	</body>
 </html>
